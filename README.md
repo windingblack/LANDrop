@@ -5,7 +5,7 @@
 <details>
 <summary>目录</summary>
 
-- [SyncClipboard](#LanDrop)
+- [LanDrop](#LanDrop)
   - [需求分析](#需求分析)
   - [关键词](#关键词)
   - [关键特性](#关键特性)
