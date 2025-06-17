@@ -1,11 +1,11 @@
-# LanDrop
+# LANDrop
 
 中文 | [English](docs/README_EN.md)  
 
 <details>
 <summary>目录</summary>
 
-- [LanDrop](#LanDrop)
+- [LANDrop](#LANDrop)
   - [需求分析](#需求分析)
   - [关键词](#关键词)
   - [关键特性](#关键特性)
@@ -23,7 +23,7 @@
 * 类似 `LocalSend` 的文件传输工具主要以文件传输功能为主，传输文本消息不方便
 * 小工具 `Kouchat` 支持跨平台，可惜功能太简洁，不能传图片和文件，也不保存历史消息
 * 用 `邮件` 在两台设备间传输信息也挺快，但步骤稍微有点多
-* 最接近这个需求的就是 `Microsoft Edge Drop`，但有时加载很慢。如果有一个类似的应用能在局域网中部署就更好了，所以我写了这个 `LanDrop`
+* 最接近这个需求的就是 `Microsoft Edge Drop`，但有时加载很慢。如果有一个类似的应用能在局域网中部署就更好了，所以我写了这个 `LANDrop`
 
 ## 关键词
 
@@ -66,8 +66,8 @@
 3. 修改配置文件 `config.json`：
 ```json
 {
-  "uploadDir": "c:/LanDrop/uploads",
-  "dbPath": "c:/LanDrop/chat.db",
+  "uploadDir": "c:/LANDrop/uploads",
+  "dbPath": "c:/LANDrop/chat.db",
   "port": 33000,
   "pageSize": 10
 }

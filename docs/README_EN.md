@@ -1,11 +1,11 @@
-# LanDrop
+# LANDrop
 
 [中文](../README.md) | English
 
 <details>
 <summary>Table of Contents</summary>
 
-* [LanDrop](#LanDrop)
+* [LANDrop](#LANDrop)
 
   * [Requirement Analysis](#requirement-analysis)
   * [Keywords](#keywords)
@@ -25,7 +25,7 @@ I need a lightweight LAN-based messaging application that doesn't require accoun
 * File transfer tools like **LocalSend** mainly focus on file transfers and are not convenient for sending text messages.
 * Lightweight tools like **Kouchat** are cross-platform but too simplistic — they don’t support images or file transmission, and don’t keep message history.
 * **Email** can also be used to transfer information between two devices, but it's a bit more cumbersome.
-* The closest existing solution is **Microsoft Edge Drop**, but it sometimes loads slowly. A similar tool that can be deployed on the local network would be ideal — hence I developed **LanDrop**.
+* The closest existing solution is **Microsoft Edge Drop**, but it sometimes loads slowly. A similar tool that can be deployed on the local network would be ideal — hence I developed **LANDrop**.
 
 ## Keywords
 
@@ -74,8 +74,8 @@ I need a lightweight LAN-based messaging application that doesn't require accoun
 
    ```json
    {
-     "uploadDir": "c:/LanDrop/uploads",
-     "dbPath": "c:/LanDrop/chat.db",
+     "uploadDir": "c:/LANDrop/uploads",
+     "dbPath": "c:/LANDrop/chat.db",
      "port": 33000,
      "pageSize": 10
    }
