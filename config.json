@@ -1,0 +1,6 @@
+{
+  "uploadDir": "./uploads",
+  "dbPath": "./chat.db",
+  "port": 33000,
+  "pageSize": 10
+}

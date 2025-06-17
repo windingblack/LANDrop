@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> -->
+  <title>LanDrop</title>
+  <link href="/css/tailwind.min.css" rel="stylesheet" />
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    html, body, #messages {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      background-color: #f3f4f6; /* Tailwind gray-100 */
+      touch-action: pan-x pan-y;
+    }
+    header {
+      flex: 0 0 50px;
+      color: white;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      padding-left: 1rem;
+      font-size: 1.25rem;
+    }
+    
+    button:hover {
+      cursor: pointer;
+    }
+
+    #messages {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    #form {
+      flex: 0 0 auto;
+      background: rgba(255,255,255,0);
+      padding: 0.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #form button {
+        margin-top: 6px;
+    }
+    textarea {
+      resize: none;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    #uploadBtn {
+        margin-right:10px;
+    }
+    .chat-bubble {
+      background-color: #e5e7eb; /* Tailwind gray-200 */
+      color: black;
+      padding: 0.5rem 0.75rem;
+      border-radius: 1rem;
+      max-width: 80%;
+      font-size: 1.5rem;
+      display: inline-block;
+      word-break: break-word;
+    }
+    .chat-time {
+      font-size: 1.25rem;
+      color: #6b7280; /* Tailwind gray-500 */
+      margin-bottom: 0.25rem;
+    }
+    .img-thumb {
+      width: 120px;
+      height: auto;
+      border-radius: 0.5rem;
+      transition: transform 0.2s;
+    }
+    .img-thumb:hover {
+      cursor: zoom-in;
+      transform: scale(1.1);
+    }
+    .image-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .image-wrapper::after {
+      content: "\1F50D";
+      font-size: 1.5rem;
+      position: absolute;
+      right: 0.25rem;
+      bottom: 0.25rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .image-wrapper:hover::after {
+      opacity: 1;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 50;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-overlay img {
+      max-width: 90%;
+      max-height: 90%;
+      cursor: zoom-out;
+      border-radius: 0.5rem;
+    }
+  </style>
+  <style>
+    .loader {
+        border-top-color: #10b981; /* green */
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to {
+        transform: rotate(360deg);
+        }
+    }
+  </style>
+  <style>
+    .progress-wrapper {
+        transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .progress-wrapper.hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    /* 漂移消失动画 */
+    @keyframes floatOut {
+        0% {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(-40px);
+            opacity: 0;
+        }
+    }
+
+    .floating-progress {
+        position: fixed;
+        z-index: 9999;
+        animation: floatOut 0.8s linear forwards;
+        pointer-events: none;
+    }
+  </style>
+</head>
+<div id="loadingOverlay" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+  <div class="loader border-4 border-white border-t-green-500 rounded-full w-12 h-12 animate-spin"></div>
+</div>
+<body>
+  <header class="bg-blue-500" >LanDrop</header>
+  <main id="messages"></main>
+  <form id="form">
+    <textarea id="input" rows="3" placeholder="Type a message..."></textarea>
+    <div class="flex justify-end gap-2">
+      <input type="file" id="fileInput" class="hidden" accept="*/*" multiple />
+      <button type="button" id="uploadBtn" class="text-blue-500 text-m" title="Upload file">🔗</button>
+      <button type="submit" class="bg-blue-500 text-white rounded px-3 py-1">Send</button>
+    </div>
+  </form>
+  <div id="progressArea" class="space-y-2 shadow"></div>
+
+  <div id="imageModal" class="modal-overlay" onclick="closeModal()">
+    <img id="modalImage" src="" alt="preview" />
+  </div>
+
+  <script>
+    const socket = io();
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const imageModal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+
+    function escapeHtml(unsafe) {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    /**Start Notification Start**/
+    function showToast(message, duration = 2000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.remove('hidden');
+        toast.classList.add('opacity-100');
+
+        setTimeout(() => {
+            toast.classList.remove('opacity-100');
+            setTimeout(() => toast.classList.add('hidden'), 300);
+        }, duration);
+    }
+
+    /**End Notification End**/
+
+    /**Start 加载消息 Start**/
+    function renderFileMessage(msg) {
+        const container = document.createElement('div');
+        container.className = 'chat-bubble';
+
+        if (msg.deleted) {
+            container.innerHTML = `<span class="line-through text-gray-500">${msg.filename}</span>`;
+        } else {
+            container.innerHTML = `
+            <a href="/file/${msg.content}" class="text-blue-600 underline mr-2" target="_blank">${msg.filename}</a>
+            <button class="delete-btn text-red-500" title="Delete File">🗑</button>
+            `;
+            const deleteBtn = container.querySelector('.delete-btn');
+            deleteBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to delete this file?')) {
+                    fetch(`/delete/${msg.id}`, { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            // 可刷新单条消息或整体刷新
+                            container.innerHTML = `<span class="line-through text-gray-500">${msg.filename}</span>`;
+                            showToast("Successfully deleted", 1000)
+                        } else {
+                            alert('Failed to delete the file.');
+                        }
+                    });
+                }
+            });
+        }
+
+        return container;
+    }
+
+    function buildMessage(message) {
+        const item = document.createElement('div');
+        const { time, type, content, filename } = message;
+        const timeStr = new Date(time).toLocaleString();
+
+        item.innerHTML = `<div class="chat-time">${timeStr}</div>`;
+
+        if (type === 'text') {
+            item.innerHTML += `<div class="chat-bubble">${linkify(escapeHtml(content))}</div>`;
+        } else if (type === 'image') {
+            item.innerHTML += `
+            <div class="image-wrapper">
+                <img src="/file/${content}" class="img-thumb preview-img" data-src="/file/${content}">
+            </div>`;
+        } else if (type === 'file') {
+            item.appendChild(renderFileMessage(message));
+        }
+        
+        return item;
+    }
+
+    function addMessage(message) {
+        const item = buildMessage(message);
+        messages.appendChild(item); // 插入到底部
+        setTimeout(() => {
+            messages.scrollTop = messages.scrollHeight;
+        }, 0);
+
+        item.querySelectorAll('.preview-img').forEach(img => {
+            img.onclick = () => openModal(img.dataset.src);
+        });
+    }
+
+    function addMessageBatch(msgs, toTop = false) {
+        if (toTop) {
+            const oldScrollHeight = messages.scrollHeight;
+            items = msgs.reverse().map(msg => buildMessage(msg));
+            items.forEach(item => attachItem(messages.prepend.bind(messages), item)); // 插入到顶部
+            // 保持滚动位置相对不动（即仍显示刚刚加载出的最后一条）
+            setTimeout(() => {
+                setTimeout(() => {
+                    const newScrollHeight = messages.scrollHeight;
+                    messages.scrollTop += newScrollHeight - oldScrollHeight;
+                }, 0);
+            }, 0);
+        } else {
+            messages.innerHTML = '';
+            items = msgs.map(msg => buildMessage(msg))
+            items.forEach(item => attachItem(messages.appendChild.bind(messages), item)); // 插入到底部
+            setTimeout(() => {
+                messages.scrollTop = messages.scrollHeight;
+            }, 0);
+        }
+    }
+
+    function attachItem(attach, item) {
+        attach(item);
+
+        item.querySelectorAll('.preview-img').forEach(img => {
+            img.onclick = () => openModal(img.dataset.src);
+        });
+    }
+
+    function linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+        return text.replace(urlRegex, function(url) {
+            const escapedUrl = url.replace(/"/g, '&quot;'); // 防止属性注入
+            return `<a href="${escapedUrl}" target="_blank" class="text-blue-500 underline">${url}</a>`;
+        });
+    }
+
+
+    socket.on('chat message', (msg) => addMessage(msg));
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = input.value.trim();
+      if (val) {
+        socket.emit('chat message', val);
+        input.value = '';
+      }
+    });
+    /**End 加载消息 End**/
+
+    /**Start Draw loading animation Start**/
+    function showLoading() {
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+    }
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+    /**End Draw loading animation End**/
+
+    /**Start 滚动监听，接近顶部加载更多消息 Start**/
+    let isLoading = false;
+    let isAllLoaded = false;
+
+    function scrollLoad() {
+        messages.addEventListener('scroll', () => {
+            if (isLoading || isAllLoaded) return;
+
+            if (messages.scrollTop < 50) {  // 接近顶部
+                isLoading = true;
+                showLoading();
+
+                loadMessages().then(() => {
+                // 保持滚动位置不变（防止跳动）
+                    messages.scrollTop = 50;
+                    isLoading = false;
+                    hideLoading();
+                });
+            }
+        });
+    }
+    /**End 滚动监听，接近顶部加载更多消息**/
+
+    /**Start 页面初始化时请求最新一页消息 Start**/
+    let offset = 0;
+
+    //reset：分页是否第一页
+    async function loadMessages(reset = false) {
+        const res = await fetch(`/messages?offset=${offset}`);
+        if (!res.ok) {
+            alert('Failed to load messages.');
+            return;
+        }
+
+        const data = await res.json();
+
+        addMessageBatch(data.messages, !reset);  // 第二个参数表示插入到顶部
+
+        offset += data.messages.length;
+
+        // 如果消息总数 <= 当前加载数，说明已经加载完了
+        if (offset >= data.total) {
+            isAllLoaded = true;
+        }
+
+        if (reset) {
+            scrollLoad();
+        }
+    }
+
+    loadMessages(true);
+    /**End 页面初始化时请求最新一页消息 End**/
+
+    /**Start 文件/图片上传 Start**/
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const files = fileInput.files;
+        if (!files.length) return;
+
+        for (let file of files) {
+            uploadFile(file);
+        }
+    });
+
+    const progressArea = document.getElementById('progressArea');
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('fileData', file);
+
+        // 创建进度条元素
+        const wrapper = document.createElement('div');
+        wrapper.className = 'progress-wrapper relative bg-gray-300 rounded overflow-hidden h-6 mt-2 shadow';
+
+        const bar = document.createElement('div');
+        bar.className = 'bg-green-500 h-full w-0 transition-all duration-300';
+        wrapper.appendChild(bar);
+
+        const fileName = document.createElement('span');
+        fileName.className = 'absolute left-1/2 top-1/2 text-white text-xs transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap';
+        fileName.textContent = file.name;
+        wrapper.appendChild(fileName);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.innerHTML = '✖';
+        cancelBtn.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-lg';
+        wrapper.appendChild(cancelBtn);
+
+        progressArea.appendChild(wrapper);
+
+        // 上传逻辑
+        const xhr = new XMLHttpRequest();
+
+        cancelBtn.onclick = () => {
+            xhr.abort();
+            fadeOut(wrapper);
+            fileInput.value = ''; // 清空已选文件
+        };
+
+        xhr.upload.onprogress = e => {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                bar.style.width = `${percent}%`;
+            }
+        };
+
+        xhr.onload = () => {
+            fileName.textContent = '✅ 上传完成';
+            setTimeout(() => fadeOut(wrapper), 1000);
+        };
+
+        xhr.onerror = () => {
+            fileName.textContent = '❌ 上传失败';
+            setTimeout(() => fadeOut(wrapper), 1000);
+        };
+
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+    }
+
+    // ⭐ 动画浮出并移除
+    function fadeOut(wrapper) {
+        // 获取位置和尺寸
+        const rect = wrapper.getBoundingClientRect();
+
+        // 克隆 DOM
+        const clone = wrapper.cloneNode(true);
+        clone.classList.add('floating-progress');
+        clone.style.left = rect.left + 'px';
+        clone.style.top = rect.top + 'px';
+        clone.style.width = rect.width + 'px';
+        clone.style.height = rect.height + 'px';
+
+        // 加到 body，立即从原地 remove
+        document.body.appendChild(clone);
+        wrapper.remove();
+
+        // 动画结束再彻底销毁 clone
+        clone.addEventListener('animationend', () => clone.remove());
+    }
+
+
+    /**End 文件/图片上传 End**/
+
+    /**Start 图片预览 Start**/
+    function openModal(src) {
+      modalImage.src = src;
+      imageModal.classList.add('active');
+    }
+
+    function closeModal() {
+      imageModal.classList.remove('active');
+      modalImage.src = '';
+    }
+
+    //双指同时缩放 + 拖动的逻辑
+    let initialDistance = 0;
+    let lastScale = 1;
+    let currentScale = 1;
+
+    let startMidpoint = { x: 0, y: 0 };
+    let currentTranslate = { x: 0, y: 0 };
+    let lastTranslate = { x: 0, y: 0 };
+
+    let lastTapTime = 0;
+
+    function getMidpoint(t1, t2) {
+        return {
+            x: (t1.clientX + t2.clientX) / 2,
+            y: (t1.clientY + t2.clientY) / 2
+        };
+    }
+
+    function updateTransform() {
+        modalImage.style.transform = `translate(${currentTranslate.x}px, ${currentTranslate.y}px) scale(${currentScale})`;
+    }
+
+    function resetImageTransform() {
+        currentScale = 1;
+        currentTranslate = { x: 0, y: 0 };
+        lastTranslate = { x: 0, y: 0 };
+        modalImage.style.transition = 'transform 0.3s ease';
+        updateTransform();
+        setTimeout(() => modalImage.style.transition = '', 300);
+    }
+
+    imageModal.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+            const [t1, t2] = e.touches;
+            initialDistance = Math.hypot(
+                t2.clientX - t1.clientX,
+                t2.clientY - t1.clientY
+            );
+            startMidpoint = getMidpoint(t1, t2);
+            lastScale = currentScale;
+
+            // 设置 transform-origin 为中点
+            const rect = modalImage.getBoundingClientRect();
+            const offsetX = ((startMidpoint.x - rect.left) / rect.width) * 100;
+            const offsetY = ((startMidpoint.y - rect.top) / rect.height) * 100;
+            modalImage.style.transformOrigin = `${offsetX}% ${offsetY}%`;
+        }
+    });
+
+    imageModal.addEventListener('touchmove', e => {
+        if (e.touches.length === 2) {
+            const [t1, t2] = e.touches;
+            const newDistance = Math.hypot(
+                t2.clientX - t1.clientX,
+                t2.clientY - t1.clientY
+            );
+            const newMidpoint = getMidpoint(t1, t2);
+
+            // 缩放计算
+            const scaleFactor = newDistance / initialDistance;
+            currentScale = Math.min(Math.max(lastScale * scaleFactor, 1), 4);
+
+            // 拖动计算（双指移动的中点偏移）
+            currentTranslate.x = lastTranslate.x + (newMidpoint.x - startMidpoint.x);
+            currentTranslate.y = lastTranslate.y + (newMidpoint.y - startMidpoint.y);
+
+            updateTransform();
+            e.preventDefault();
+        }
+    });
+
+    imageModal.addEventListener('touchend', e => {
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+            resetImageTransform();
+        }
+        lastTapTime = now;
+
+        if (e.touches.length < 2) {
+            lastTranslate = { ...currentTranslate };
+            initialDistance = 0;
+        }
+    });
+    /**End 图片预览 End**/
+
+    /**Start 长按选中消息的全部内容 Start**/
+    let timer = null;
+
+    messages.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('.chat-bubble');
+        if (!target) return;
+
+        timer = setTimeout(() => {
+            selectElementText(target);
+        }, 500);
+    });
+
+    messages.addEventListener('touchend', () => clearTimeout(timer));
+    messages.addEventListener('touchmove', () => clearTimeout(timer));
+
+    function selectElementText(el) {
+        if (window.getSelection && document.createRange) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            selection.removeAllRanges();
+            range.selectNodeContents(el);
+            selection.addRange(range);
+        }
+    }
+    /**End 长按选中消息的全部内容 End**/
+
+    const textarea = document.getElementById('input');
+
+    textarea.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();  // 阻止换行
+            document.querySelector('#form button[type="submit"]').click();
+        }
+    });
+
+  </script>
+</body>
+<div id="toast" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50 hidden"></div>
+</html>

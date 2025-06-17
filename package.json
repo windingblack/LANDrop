@@ -1,0 +1,29 @@
+{
+  "name": "anonymous-chatroom",
+  "version": "1.0.0",
+  "description": "一个基于 Express 和 Socket.IO 的匿名聊天室，支持文字和图片聊天，聊天记录保存在 SQLite 中。",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [
+    "chatroom",
+    "express",
+    "socket.io",
+    "sqlite",
+    "anonymous"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.4",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.2",
+    "sqlite3": "^5.1.6",
+    "iconv-lite": "^0.6.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
