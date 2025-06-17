@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> -->
-  <title>LanDrop</title>
+  <title>LANDrop</title>
   <link href="/css/tailwind.min.css" rel="stylesheet" />
   <script src="/socket.io/socket.io.js"></script>
   <style>
@@ -166,7 +166,7 @@
   <div class="loader border-4 border-white border-t-green-500 rounded-full w-12 h-12 animate-spin"></div>
 </div>
 <body>
-  <header class="bg-blue-500" >LanDrop</header>
+  <header class="bg-blue-500" >LANDrop</header>
   <main id="messages"></main>
   <form id="form">
     <textarea id="input" rows="3" placeholder="Type a message..."></textarea>
@@ -451,13 +451,14 @@
         };
 
         xhr.onload = () => {
-            fileName.textContent = '✅ 上传完成';
+            fileName.textContent = '✅ Successfully uploaded';
             setTimeout(() => fadeOut(wrapper), 1000);
         };
 
         xhr.onerror = () => {
-            fileName.textContent = '❌ 上传失败';
+            fileName.textContent = '❌ Failed to upload file';
             setTimeout(() => fadeOut(wrapper), 1000);
+            fileInput.value = ''; // 清空已选文件
         };
 
         xhr.open('POST', '/upload');
