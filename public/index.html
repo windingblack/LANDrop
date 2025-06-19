@@ -301,10 +301,10 @@
 
     function addMessageBatch(msgs, toTop = false) {
         if (toTop) {
-            const relatedPosition = messages.scrollHeight - messages.scrollTop;
             const promises = msgs.reverse().map(msg => buildMessage(msg));
             Promise.all(promises)
                 .then(items => {
+                    const relatedPosition = messages.scrollHeight - messages.scrollTop;
                     items.forEach(item => attachItem(
                         messages.prepend.bind(messages), 
                         item
